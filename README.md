@@ -11,7 +11,6 @@ Currently at **Version 1.0**, the engine serves as a foundational baseline: it f
 
 - **`src/`** - The core C source code and header files for the engine.
 - **`bin/`** - Contains the compiled executable (`broncos_engine`). Ignored by version control.
-- **`tests/`** - Tools for testing the engine, including opening books (`book.epd`) and external match results.
 - **`tools/`** - Additional utilities and GUI wrappers (e.g., UciBoardArena).
 
 ## Building the Engine
