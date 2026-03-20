@@ -1,0 +1,9 @@
+# Object files
+*.o
+
+# Binary output directory and executable
+bin/
+broncos_engine
+
+# Arena and Java compiled files
+*.class
