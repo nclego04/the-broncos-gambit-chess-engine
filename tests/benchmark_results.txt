@@ -33,4 +33,7 @@ Depth 7 | Nodes: 177049384 | EBF: 16.17 | Time:   1262 ms | NPS: 140325273
 Total Nodes: 510332152
 Total Time : 5162 ms
 Average NPS: 98857556
+EBF at Depth 4 (Start Pos) : 22.16
+EBF at Depth 4 (Kiwipete)  : 41.73
+EBF at Depth 4 (Endgame)   : 15.33
 ====================================================
