@@ -45,9 +45,7 @@ Tracking the engine's playing strength and search performance across major updat
 ## Project Structure
 
 - **`src/`** - The core C source code and header files for the engine.
-- **`bin/`** - Contains the compiled executable (`broncos_engine`). Ignored by version control.
 - **`tools/`** - Additional utilities and GUI wrappers (e.g., UciBoardArena).
-- **`tests/`** - Testing materials including performance benchmarks.
 
 ## Prerequisites
 
