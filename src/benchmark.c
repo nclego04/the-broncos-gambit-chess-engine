@@ -1,86 +1,151 @@
+/**
+ * @file benchmark.c
+ * @brief Performance testing and benchmarking suite.
+ *
+ * Runs Alpha-Beta search simulations to calculate NPS and EBF across various depths.
+ */
+#define _POSIX_C_SOURCE 199309L
 #include <stdio.h>
 #include <string.h>
-#include <sys/time.h>
+#include <time.h>
+#include <math.h>
 #include "types.h"
 #include "benchmark.h"
 #include "board.h"
 #include "movegen.h"
+#include "search.h"
+#include "logger.h"
 
-// --- High Precision Timer ---
+/**
+ * @brief Gets the current system time in milliseconds with high precision.
+ *
+ * @return The time in milliseconds since an unspecified epoch (monotonic clock).
+ */
 static double get_time_ms() {
-    struct timeval time;
-    gettimeofday(&time, NULL);
-    return (time.tv_sec * 1000.0) + (time.tv_usec / 1000.0);
+    struct timespec time;
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    return (time.tv_sec * 1000.0) + (time.tv_nsec / 1000000.0);
 }
 
-static uint64_t perft(Board *pos, int depth) {
-    if (depth == 0) return 1ULL;
-    
-    MoveList list;
-    generate_all_moves(pos, &list);
-    
-    uint64_t nodes = 0;
-    int side = pos->side_to_move;
-    int enemy = (side == WHITE) ? BLACK : WHITE;
-    int our_king = (side == WHITE) ? K : k;
-    
-    for (int i = 0; i < list.count; i++) {
-        Board next_pos = *pos;
-        make_move(&next_pos, list.moves[i]);
-        
-        if (next_pos.bitboards[our_king] == 0) continue; 
-        int king_sq = get_lsb(next_pos.bitboards[our_king]);
-        if (is_square_attacked(king_sq, enemy, &next_pos)) continue;
-        
-        nodes += perft(&next_pos, depth - 1);
+/**
+ * @brief Benchmarks the engine against a standardized suite of positions (EPD/FEN file).
+ *
+ * @param filename The name of the EPD/FEN suite file.
+ * @param depth The target depth to search each position.
+ */
+void bench_nps_ebf(const char *filename, int depth) {
+    FILE *f = logger_open_file(filename, "r");
+    if (!f) {
+        printf("Error: Could not open suite file '%s'\n", filename);
+        return;
     }
-    return nodes;
-}
 
-static void bench_position(const char* name, const char* fen, int max_depth, uint64_t *total_nodes, double *total_time_ms) {
-    Board pos;
-    parse_fen(&pos, fen);
-    
-    printf("\n--- Benchmarking: %s ---\n", name);
-    printf("FEN: %s\n", fen);
-    
-    uint64_t prev_nodes = 0;
-    
-    for (int depth = 1; depth <= max_depth; depth++) {
-        double start_time = get_time_ms();
-        uint64_t nodes_searched = perft(&pos, depth);
-        
-        double ebf = (prev_nodes > 0) ? (double)nodes_searched / prev_nodes : 0.0;
-        prev_nodes = nodes_searched;
-        
-        double elapsed_ms = get_time_ms() - start_time;
-        double elapsed_sec = elapsed_ms / 1000.0;
-        uint64_t nps = (elapsed_sec > 0.001) ? (uint64_t)(nodes_searched / elapsed_sec) : 0;
-        
-        printf("Depth %d | Nodes: %8llu | EBF: %5.2f | Time: %6.0f ms | NPS: %llu\n", 
-               depth, (unsigned long long)nodes_searched, ebf, elapsed_ms, (unsigned long long)nps);
-               
-        if (total_nodes) *total_nodes += nodes_searched;
-        if (total_time_ms) *total_time_ms += elapsed_ms;
-    }
-}
-
-void run_benchmark() {
+    char line[2048];
     uint64_t total_nodes = 0;
     double total_time_ms = 0.0;
-
-    printf("====================================================\n");
-    printf("               ENGINE BENCHMARK TOOL                \n");
-    printf("====================================================\n");
-    bench_position("Starting Position", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 6, &total_nodes, &total_time_ms);
-    bench_position("Complex Midgame (Kiwipete)", "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 5, &total_nodes, &total_time_ms);
-    bench_position("Deep Endgame", "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 7, &total_nodes, &total_time_ms); 
+    int pos_count = 0;
     
-    printf("\n====================================================\n");
-    double total_time_sec = total_time_ms / 1000.0;
-    uint64_t average_nps = (total_time_sec > 0.001) ? (uint64_t)(total_nodes / total_time_sec) : 0;
+    FILE *out = logger_open_file("benchmark_nps_ebf.txt", "w");
+    if (!out) {
+        printf("Note: Could not open tests/benchmark_nps_ebf.txt for writing.\n");
+    }
+
+    printf("Running suite '%s' at Depth %d...\n", filename, depth);
+    if (out) fprintf(out, "Running suite '%s' at Depth %d...\n", filename, depth);
+
+    while (fgets(line, sizeof(line), f)) {
+        if (line[0] == '\n' || line[0] == '\0') continue;
+        
+        Board pos;
+        parse_fen(&pos, line); 
+        
+        double start_time = get_time_ms();
+        total_nodes += search_for_benchmark(&pos, depth);
+        total_time_ms += (get_time_ms() - start_time);
+        pos_count++;
+    }
+    fclose(f);
+
+    if (pos_count == 0) {
+        if (out) fclose(out);
+        return;
+    }
+
+    double avg_nodes = (double)total_nodes / pos_count;
+    double overall_ebf = pow(avg_nodes, 1.0 / depth);
+    uint64_t overall_nps = (total_time_ms > 1.0) ? (uint64_t)((total_nodes * 1000.0) / total_time_ms) : 0;
+
+    printf("\n--- Suite Benchmark Results ---\n");
+    if (out) fprintf(out, "\n--- Suite Benchmark Results ---\n");
+    printf("Positions  : %d\n", pos_count);
+    if (out) fprintf(out, "Positions  : %d\n", pos_count);
     printf("Total Nodes: %llu\n", (unsigned long long)total_nodes);
+    if (out) fprintf(out, "Total Nodes: %llu\n", (unsigned long long)total_nodes);
     printf("Total Time : %.0f ms\n", total_time_ms);
-    printf("Average NPS: %llu\n", (unsigned long long)average_nps);
-    printf("====================================================\n");
+    if (out) fprintf(out, "Total Time : %.0f ms\n", total_time_ms);
+    printf("Overall NPS: %llu\n", (unsigned long long)overall_nps);
+    if (out) fprintf(out, "Overall NPS: %llu\n", (unsigned long long)overall_nps);
+    printf("Overall EBF: %5.2f\n", overall_ebf);
+    if (out) fprintf(out, "Overall EBF: %5.2f\n", overall_ebf);
+    printf("-------------------------------\n");
+    if (out) fprintf(out, "-------------------------------\n");
+    
+    if (out) fclose(out);
+}
+
+/**
+ * @brief Benchmarks the engine by running a fixed-time search on a suite of positions.
+ *
+ * @param filename The name of the EPD/FEN suite file.
+ * @param time_ms The maximum time limit per position in milliseconds.
+ */
+void bench_avg_depth(const char *filename, int time_ms) {
+    FILE *f = logger_open_file(filename, "r");
+    if (!f) {
+        printf("Error: Could not open suite file '%s'\n", filename);
+        return;
+    }
+
+    FILE *out = logger_open_file("benchmark_avg_depth.txt", "w");
+    if (!out) {
+        printf("Note: Could not open tests/benchmark_avg_depth.txt for writing.\n");
+    }
+
+    char line[2048];
+    int total_depth = 0;
+    int pos_count = 0;
+
+    printf("Running time suite '%s' at %d ms per move...\n", filename, time_ms);
+    if (out) fprintf(out, "Running time suite '%s' at %d ms per move...\n", filename, time_ms);
+
+    while (fgets(line, sizeof(line), f)) {
+        if (line[0] == '\n' || line[0] == '\0') continue;
+        
+        Board pos;
+        parse_fen(&pos, line); 
+        
+        // Use the real game search with a strict time limit
+        search_position(&pos, time_ms);
+        total_depth += get_search_depth();
+        pos_count++;
+    }
+    fclose(f);
+
+    if (pos_count == 0) {
+        if (out) fclose(out);
+        return;
+    }
+
+    printf("\n--- Time Benchmark Results ---\n");
+    if (out) fprintf(out, "\n--- Time Benchmark Results ---\n");
+    printf("Positions    : %d\n", pos_count);
+    if (out) fprintf(out, "Positions    : %d\n", pos_count);
+    printf("Time per move: %d ms\n", time_ms);
+    if (out) fprintf(out, "Time per move: %d ms\n", time_ms);
+    printf("Average Depth: %5.2f\n", (double)total_depth / pos_count);
+    if (out) fprintf(out, "Average Depth: %5.2f\n", (double)total_depth / pos_count);
+    printf("------------------------------\n");
+    if (out) fprintf(out, "------------------------------\n");
+    
+    if (out) fclose(out);
 }

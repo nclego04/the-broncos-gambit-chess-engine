@@ -1,10 +1,22 @@
+/**
+ * @file board.c
+ * @brief Board state management and move execution.
+ *
+ * Handles parsing FEN strings to initialize the board and applying
+ * legal/pseudo-legal moves to update the bitboards and game state.
+ */
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
 #include "types.h"
 #include "board.h"
 
-// Helper function to map a character to our enum index
+/**
+ * @brief Converts a character representation of a chess piece to its enum index.
+ *
+ * @param c The character representing the piece (e.g., 'P', 'n', 'K').
+ * @return The corresponding piece enum value (0-11), or -1 if invalid.
+ */
 int char_to_piece(char c) {
     switch(c) {
         case 'P': return P; case 'N': return N; case 'B': return B;
@@ -15,8 +27,16 @@ int char_to_piece(char c) {
     }
 }
 
+/**
+ * @brief Parses a FEN (Forsyth-Edwards Notation) string and sets up the board.
+ *
+ * @warning MUTATES the passed Board struct. It completely wipes the current
+ * board state and replaces it with the position described in the FEN string.
+ *
+ * @param pos Pointer to the board state to initialize.
+ * @param fen The FEN string representing the desired board position.
+ */
 void parse_fen(Board *pos, const char *fen) {
-    // 1. Wipe the board completely clean (All bits to 0)
     memset(pos, 0, sizeof(Board));
     pos->en_passant = -1;
 
@@ -24,7 +44,6 @@ void parse_fen(Board *pos, const char *fen) {
     int file = 0;
     int i = 0;
 
-    // 2. Parse the piece placement data
     while (fen[i] != ' ' && fen[i] != '\0') {
         char c = fen[i];
         
@@ -32,18 +51,14 @@ void parse_fen(Board *pos, const char *fen) {
             rank--;
             file = 0;
         } else if (isdigit((unsigned char)c)) {
-            // A number means empty squares, just skip the file index forward
             file += (c - '0');
         } else {
             int piece = char_to_piece(c);
             if (piece != -1) {
-                // Calculate square index (a1 is 0, h8 is 63)
                 int sq = rank * 8 + file;
                 
-                // Toggle the 1 bit on the specific piece bitboard!
                 set_bit(pos->bitboards[piece], sq);
                 
-                // Toggle the 1 bit on the occupancy bitboards!
                 int color = isupper((unsigned char)c) ? WHITE : BLACK;
                 set_bit(pos->occupancies[color], sq);
                 set_bit(pos->occupancies[BOTH], sq);
@@ -53,13 +68,12 @@ void parse_fen(Board *pos, const char *fen) {
         i++;
     }
 
-    // 3. Parse side to move
-    i++; // skip the space
+    i++; 
     if (fen[i] == 'b') pos->side_to_move = BLACK;
     else pos->side_to_move = WHITE;
     
-    i++; // move to the space after w/b
-    i++; // move to the start of castling rights
+    i++; 
+    i++; 
     pos->castling_rights = 0;
     while (fen[i] != ' ' && fen[i] != '\0') {
         if (fen[i] == 'K') pos->castling_rights |= 1;
@@ -70,7 +84,15 @@ void parse_fen(Board *pos, const char *fen) {
     }
 }
 
-// --- Move Execution ---
+/**
+ * @brief Executes a move and updates the internal board state.
+ *
+ * @warning MUTATES the passed Board struct. This function does not validate
+ * pseudo-legality or check status. Ensure `move` is valid before calling.
+ *
+ * @param pos Pointer to the board state to modify.
+ * @param move The bit-packed integer representing the move to apply.
+ */
 void make_move(Board *pos, int move) {
     int from = get_from(move);
     int to = get_to(move);
@@ -79,16 +101,13 @@ void make_move(Board *pos, int move) {
     int side = pos->side_to_move;
     int enemy = (side == WHITE) ? BLACK : WHITE;
 
-    // 1. Pick up the moving piece
     pop_bit(pos->bitboards[piece], from);
     pop_bit(pos->occupancies[side], from);
     pop_bit(pos->occupancies[BOTH], from);
 
-    // 2. Handle Captures (Is there an enemy piece on the target square?)
     if (get_bit(pos->occupancies[enemy], to)) {
-        // Find exactly which enemy piece we captured and remove it
-        int start_piece = (side == WHITE) ? p : P; // p=6, P=0
-        int end_piece = (side == WHITE) ? k : K;   // k=11, K=5
+        int start_piece = (side == WHITE) ? p : P; 
+        int end_piece = (side == WHITE) ? k : K;   
         
         for (int bb_piece = start_piece; bb_piece <= end_piece; bb_piece++) {
             if (get_bit(pos->bitboards[bb_piece], to)) {
@@ -97,9 +116,17 @@ void make_move(Board *pos, int move) {
             }
         }
         pop_bit(pos->occupancies[enemy], to);
+    } 
+    
+    else if ((piece == P || piece == p) && (from % 8 != to % 8)) {
+        int captured_pawn_sq = (side == WHITE) ? to - 8 : to + 8;
+        int captured_pawn_piece = (side == WHITE) ? p : P;
+        
+        pop_bit(pos->bitboards[captured_pawn_piece], captured_pawn_sq);
+        pop_bit(pos->occupancies[enemy], captured_pawn_sq);
+        pop_bit(pos->occupancies[BOTH], captured_pawn_sq);
     }
 
-    // 3. Put the moving piece down on the target square
     if (get_promotion(move)) {
         int promoted = get_promoted(move);
         set_bit(pos->bitboards[promoted], to);
@@ -109,28 +136,24 @@ void make_move(Board *pos, int move) {
     set_bit(pos->occupancies[side], to);
     set_bit(pos->occupancies[BOTH], to);
 
-    // 4. Handle Castling (Move the Rook!)
     if (get_castling(move)) {
         int rook = (side == WHITE) ? R : r;
         int r_from = 0, r_to = 0;
         
-        if (to == 6)       { r_from = 7;  r_to = 5;  } // White Kingside (h1 -> f1)
-        else if (to == 2)  { r_from = 0;  r_to = 3;  } // White Queenside (a1 -> d1)
-        else if (to == 62) { r_from = 63; r_to = 61; } // Black Kingside (h8 -> f8)
-        else if (to == 58) { r_from = 56; r_to = 59; } // Black Queenside (a8 -> d8)
+        if (to == 6)       { r_from = 7;  r_to = 5;  } 
+        else if (to == 2)  { r_from = 0;  r_to = 3;  } 
+        else if (to == 62) { r_from = 63; r_to = 61; } 
+        else if (to == 58) { r_from = 56; r_to = 59; } 
         
-        // Pick up the Rook
         pop_bit(pos->bitboards[rook], r_from);
         pop_bit(pos->occupancies[side], r_from);
         pop_bit(pos->occupancies[BOTH], r_from);
         
-        // Put the Rook down
         set_bit(pos->bitboards[rook], r_to);
         set_bit(pos->occupancies[side], r_to);
         set_bit(pos->occupancies[BOTH], r_to);
     }
 
-    // 5. Update Castling Rights (If King or Rook moves, or a Rook is captured)
     if (piece == K) pos->castling_rights &= ~3;
     if (piece == k) pos->castling_rights &= ~12;
     if (piece == R && from == 0) pos->castling_rights &= ~2;
@@ -142,6 +165,5 @@ void make_move(Board *pos, int move) {
     if (to == 56) pos->castling_rights &= ~8;
     if (to == 63) pos->castling_rights &= ~4;
 
-    // 6. Swap whose turn it is
     pos->side_to_move = enemy;
 }

@@ -1,41 +1,62 @@
+/**
+ * @file types.h
+ * @brief Core data structures and macros for the engine.
+ *
+ * Defines the 64-bit Bitboard representation, piece/color enumerations,
+ * and the bit-packed move encoding logic used throughout the engine.
+ */
 #ifndef TYPES_H
 #define TYPES_H
 
 #include <stdint.h>
 
-// A Bitboard is just a 64-bit unsigned integer
 typedef uint64_t U64;
 
-// Colors and Pieces mapped automatically to 0, 1, 2...
 enum { WHITE, BLACK, BOTH };
 enum { P, N, B, R, Q, K, p, n, b, r, q, k };
 
-// --- Elite Bitwise Macros ---
 #define get_bit(bitboard, square) ((bitboard) & (1ULL << (square)))
 #define set_bit(bitboard, square) ((bitboard) |= (1ULL << (square)))
 #define pop_bit(bitboard, square) ((bitboard) &= ~(1ULL << (square)))
 
-// --- Hardware Accelerated Helpers ---
+/**
+ * @brief Gets the index of the least significant bit (LSB).
+ *
+ * @param bitboard The 64-bit integer to scan.
+ * @return The index (0-63) of the lowest set bit. Returns 0 if the bitboard is empty.
+ */
 static inline int get_lsb(U64 bitboard) {
-    if (bitboard == 0) return 0; // Prevent fatal segfaults on empty bitboards
+    if (bitboard == 0) return 0;
     return __builtin_ctzll(bitboard);
 }
 
+/**
+ * @brief Counts the total number of set bits in a bitboard.
+ *
+ * @param bitboard The 64-bit integer to evaluate.
+ * @return The number of bits set to 1.
+ */
 static inline int count_bits(U64 bitboard) {
     return __builtin_popcountll(bitboard);
 }
 
-// The New Master Board Struct
 typedef struct {
-    U64 bitboards[12];     // Array of 12 bitboards
-    U64 occupancies[3];    // Array of 3 occupancies
+    U64 bitboards[12];  
+    U64 occupancies[3];   
     
     int side_to_move;      
     int en_passant;        
     int castling_rights;   
 } Board;
 
-// Global function to test if a square is attacked
+/**
+ * @brief Determines if a specific square is attacked by the given side.
+ *
+ * @param sq The square index (0-63) to check.
+ * @param attacker_side The color (WHITE or BLACK) of the potential attacker.
+ * @param pos Pointer to the current board state.
+ * @return 1 if the square is attacked by the specified side, 0 otherwise.
+ */
 int is_square_attacked(int sq, int attacker_side, Board *pos);
 
 // --- Move Encoding (Bit-Packing) ---
@@ -66,7 +87,12 @@ typedef struct {
     int count;
 } MoveList;
 
-// Helper to quickly push a move into the list
+/**
+ * @brief Appends a packed move to a MoveList.
+ *
+ * @param move_list Pointer to the MoveList to populate.
+ * @param move The bit-packed integer representing the move.
+ */
 static inline void add_move(MoveList *move_list, int move) {
     if (move_list->count >= 256) return; // Prevent Stack Overflow crashes
     move_list->moves[move_list->count] = move;

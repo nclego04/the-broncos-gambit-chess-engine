@@ -1,3 +1,7 @@
+/**
+ * @file magics.c
+ * @brief Magic bitboard definitions and memory allocation.
+ */
 #include "magics.h"
 
 const int rook_relevant_bits[64] = {

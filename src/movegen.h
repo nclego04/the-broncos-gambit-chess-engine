@@ -1,3 +1,7 @@
+/**
+ * @file movegen.h
+ * @brief Move generation declarations.
+ */
 #ifndef MOVEGEN_H
 #define MOVEGEN_H
 

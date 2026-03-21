@@ -7,3 +7,7 @@ broncos_engine
 
 # Arena and Java compiled files
 *.class
+
+*.epd
+*.pgn
+*.txt

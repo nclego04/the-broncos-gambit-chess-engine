@@ -1,3 +1,7 @@
+/**
+ * @file board.h
+ * @brief Board state management declarations.
+ */
 #ifndef BOARD_H
 #define BOARD_H
 

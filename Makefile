@@ -15,7 +15,7 @@ all: $(TARGET) arena
 
 $(TARGET): $(OBJS)
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) $(OBJS) -o $(TARGET)
+	$(CC) $(CFLAGS) $(OBJS) -o $(TARGET) -lm
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
