@@ -11,7 +11,6 @@ All notable changes to the Broncos Gambit engine will be documented in this file
 ### Fixed
 - **Time Management:** Removed the uncancellable Depth 1 restriction so the engine can safely abort and check the clock even if caught in an infinite Quiescence Search explosion.
 - **Fallback Move Selection:** Assigned a guaranteed safe legal move at the root node to prevent the engine from outputting `bestmove 0000` when immediately timing out.
-- **Castling Logic:** Moved castling move generation to occur strictly when the King is being processed, correctly treating it as a King move.
 
 ## [2.0.0] - Alpha-Beta Search & Evaluation
 ### Added

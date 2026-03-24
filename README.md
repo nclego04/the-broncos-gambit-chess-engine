@@ -28,7 +28,6 @@ Currently at **Version 3.0**, the engine is a highly competitive intermediate-le
 ### 4. Rule Handling & Analytics
 - **En Passant Reception:** Successfully parses, processes, and updates its internal bitboards when the opponent plays an En Passant capture to prevent board corruption.
 - **Live Analytics:** Calculates Nodes Per Second (NPS) and Effective Branching Factor (EBF) in real-time, logging them to `tests/live_nps.txt`.
-- **Castling Validation:** Ensures castling moves are cleanly generated exclusively during the King's active move processing phase.
 
 ## Version History & Benchmarks
 
