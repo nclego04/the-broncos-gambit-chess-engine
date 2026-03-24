@@ -22,12 +22,13 @@ Currently at **Version 3.0**, the engine is a highly competitive intermediate-le
 
 ### 3. Professional Time Management
 - **Live Clock Polling:** Checks the `CLOCK_MONOTONIC` high-precision system clock every 2,048 nodes to avoid overstepping time boundaries.
-- **Uncancellable Depth 1:** Refuses to check the clock during the first Iterative Deepening pass to guarantee a valid fallback move.
+- **Root Fallback Move:** Seeds the search with a guaranteed legal move before Iterative Deepening begins. This safely allows the engine to abort during Depth 1 in the event of a Quiescence Search explosion without returning an illegal `0000` move.
 - **Move Overhead Buffer:** Subtracts 20ms from allocated time to protect against OS thread scheduling and network lag.
 
 ### 4. Rule Handling & Analytics
 - **En Passant Reception:** Successfully parses, processes, and updates its internal bitboards when the opponent plays an En Passant capture to prevent board corruption.
 - **Live Analytics:** Calculates Nodes Per Second (NPS) and Effective Branching Factor (EBF) in real-time, logging them to `tests/live_nps.txt`.
+- **Castling Validation:** Ensures castling moves are cleanly generated exclusively during the King's active move processing phase.
 
 ## Version History & Benchmarks
 

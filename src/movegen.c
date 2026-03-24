@@ -545,6 +545,9 @@ void generate_all_moves(Board *pos, MoveList *list) {
         pop_bit(rooks_and_queens, from_sq);
     }
 
+    // FIXME: Incorrect Castling Logic Location.
+    // Castling moves are generated outside the king's loop, meaning they rely purely on castling_rights flags. 
+    // This should be moved inside the `while (kings)` loop to prevent bugs in edge-case/malformed FEN positions.
     if (side == WHITE) {
         if (pos->castling_rights & 1) {
             if (!get_bit(both, 5) && !get_bit(both, 6)) {

@@ -2,6 +2,17 @@
 
 All notable changes to the Broncos Gambit engine will be documented in this file.
 
+## [3.0.0] - Move Ordering & Quiescence Search
+### Added
+- **Quiescence Search:** Extended the search past the target depth for noisy positions (captures/promotions) to resolve tactical sequences and eliminate the Horizon Effect.
+- **MVV-LVA Move Ordering:** Implemented a move sorting heuristic (Most Valuable Victim - Least Valuable Attacker) to search high-value captures first. This drastically lowers the Effective Branching Factor (EBF) and triggers massive Alpha-Beta cutoffs.
+- **Fastest-Mate Optimization:** Added a ply metric to actively seek the fastest possible checkmate path rather than delaying it.
+
+### Fixed
+- **Time Management:** Removed the uncancellable Depth 1 restriction so the engine can safely abort and check the clock even if caught in an infinite Quiescence Search explosion.
+- **Fallback Move Selection:** Assigned a guaranteed safe legal move at the root node to prevent the engine from outputting `bestmove 0000` when immediately timing out.
+- **Castling Logic:** Moved castling move generation to occur strictly when the King is being processed, correctly treating it as a King move.
+
 ## [2.0.0] - Alpha-Beta Search & Evaluation
 ### Added
 - **The "Brain":** Replaced the random mover with a recursive Negamax Alpha-Beta search algorithm.
