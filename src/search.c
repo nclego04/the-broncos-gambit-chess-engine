@@ -15,14 +15,16 @@
 #include "board.h"
 #include "logger.h"
 
+// --- Alpha-Beta Search Constants ---
 #define INF 50000
 #define MATE 49000
 
-static double search_start_time = 0.0;
-static int search_time_limit = 0;
-static int stop_search = 0;
-static uint64_t nodes_searched = 0;
-static int current_search_depth = 0;
+// --- Engine Search State ---
+static double search_start_time = 0.0;     /**< Time when the current search started. */
+static int search_time_limit = 0;          /**< Allowed time for the current search in ms. */
+static int stop_search = 0;                /**< Flag to aggressively abort search tree traversal. */
+static uint64_t nodes_searched = 0;        /**< Running count of total evaluated nodes. */
+static int current_search_depth = 0;       /**< Current depth level being processed by iterative deepening. */
 
 /**
  * @brief Gets the current high-precision time in milliseconds.
@@ -57,6 +59,122 @@ int get_search_depth(void) {
 }
 
 /**
+ * @brief Simple base piece values for move ordering.
+ */
+static const int piece_scores[12] = {
+    100, 300, 320, 500, 900, 20000, // WHITE: P, N, B, R, Q, K
+    100, 300, 320, 500, 900, 20000  // BLACK: p, n, b, r, q, k
+};
+
+/**
+ * @brief Assigns a heuristic score to a move for MVV-LVA move ordering.
+ *
+ * @param pos The current board position.
+ * @param move The encoded move to score.
+ * @param hash_move The best move found in a previous iterative deepening depth.
+ * @return An integer score representing the move's estimated strength.
+ */
+static int score_move(Board *pos, int move, int hash_move) {
+    if (move == hash_move) return 2000000; 
+    
+    int score = 0;
+    int to = get_to(move);
+    int piece = get_piece(move);
+    int side = pos->side_to_move;
+    int enemy = (side == WHITE) ? BLACK : WHITE;
+    
+    if (get_bit(pos->occupancies[enemy], to)) {
+        int victim = P; 
+        int start_piece = (side == WHITE) ? p : P;
+        int end_piece = (side == WHITE) ? k : K;
+        for (int p_idx = start_piece; p_idx <= end_piece; p_idx++) {
+            if (get_bit(pos->bitboards[p_idx], to)) {
+                victim = p_idx;
+                break;
+            }
+        }
+        // MVV-LVA: Most Valuable Victim - Least Valuable Attacker
+        score = 1000000 + piece_scores[victim] * 10 - piece_scores[piece];
+    }
+    
+    if (get_promotion(move)) {
+        score += piece_scores[get_promoted(move)] * 1000; 
+    }
+    
+    return score;
+}
+
+/**
+ * @brief Sorts the next best move to the current index via selection sort.
+ */
+static inline void sort_next_move(MoveList *list, int *scores, int current_idx) {
+    int best_score = -10000000;
+    int best_idx = current_idx;
+    for (int j = current_idx; j < list->count; j++) {
+        if (scores[j] > best_score) {
+            best_score = scores[j];
+            best_idx = j;
+        }
+    }
+    int temp_move = list->moves[current_idx];
+    list->moves[current_idx] = list->moves[best_idx];
+    list->moves[best_idx] = temp_move;
+    
+    int temp_score = scores[current_idx];
+    scores[current_idx] = scores[best_idx];
+    scores[best_idx] = temp_score;
+}
+
+/**
+ * @brief Quiescence Search to resolve noisy positions (captures/promotions) 
+ *        and eliminate the horizon effect.
+ */
+static int quiescence(Board *pos, int alpha, int beta, int ply) {
+    if ((nodes_searched++ & 2047) == 0) check_time();
+    if (stop_search) return 0;
+
+    // Circuit breaker to prevent Stack Overflow in explosive tactical positions
+    if (ply > 64) return evaluate_position(pos);
+
+    int stand_pat = evaluate_position(pos);
+    if (stand_pat >= beta) return beta;
+    if (stand_pat > alpha) alpha = stand_pat;
+
+    MoveList list;
+    generate_all_moves(pos, &list);
+
+    int scores[256];
+    for (int i = 0; i < list.count; i++) {
+        scores[i] = score_move(pos, list.moves[i], 0);
+    }
+
+    int side = pos->side_to_move;
+    int enemy = (side == WHITE) ? BLACK : WHITE;
+    int our_king = (side == WHITE) ? K : k;
+
+    for (int i = 0; i < list.count; i++) {
+        sort_next_move(&list, scores, i);
+        int move = list.moves[i];
+        
+        if (!get_bit(pos->occupancies[enemy], get_to(move)) && !get_promotion(move)) continue;
+
+        Board next_pos = *pos;
+        make_move(&next_pos, move);
+
+        if (next_pos.bitboards[our_king] == 0) continue; 
+        int king_sq = get_lsb(next_pos.bitboards[our_king]);
+        if (is_square_attacked(king_sq, enemy, &next_pos)) continue;
+
+        int score = -quiescence(&next_pos, -beta, -alpha, ply + 1);
+
+        if (score >= beta) return beta;
+        if (score > alpha) alpha = score;
+    }
+
+    return alpha;
+}
+
+/**
  * @brief Evaluates a position using the Negamax algorithm with Alpha-Beta pruning.
  *
  * Recursively explores the game tree up to the specified remaining depth. 
@@ -72,20 +190,20 @@ int get_search_depth(void) {
  *         of the side to move. Returns 0 immediately if search is globally stopped.
  */
 static int alpha_beta(Board *pos, int alpha, int beta, int depth, int ply) {
-    if (current_search_depth > 1 && (nodes_searched++ & 2047) == 0) check_time();
+    if ((nodes_searched++ & 2047) == 0) check_time();
     if (stop_search) return 0;
 
     if (depth == 0) {
-        // TODO: Implement Quiescence Search here to resolve pending captures and 
-        // eliminate the Horizon Effect before calling the static evaluation.
-        return evaluate_position(pos);
+        return quiescence(pos, alpha, beta, ply);
     }
 
     MoveList list;
     generate_all_moves(pos, &list);
     
-    // TODO: Implement MVV-LVA Move Ordering here. Sorting captures first will 
-    // drastically lower the Effective Branching Factor (EBF) and increase depth.
+    int scores[256];
+    for (int i = 0; i < list.count; i++) {
+        scores[i] = score_move(pos, list.moves[i], 0);
+    }
 
     int legal_moves = 0;
     int side = pos->side_to_move;
@@ -93,6 +211,8 @@ static int alpha_beta(Board *pos, int alpha, int beta, int depth, int ply) {
     int our_king = (side == WHITE) ? K : k;
 
     for (int i = 0; i < list.count; i++) {
+        sort_next_move(&list, scores, i);
+        
         Board next_pos = *pos;
         make_move(&next_pos, list.moves[i]);
 
@@ -141,6 +261,25 @@ int search_position(Board *pos, int time_limit_ms) {
     int best_move = 0;
     int current_best_move = 0;
     
+    // --- Fallback Move Selection ---
+    // Ensure we always have at least one legal move to return in case
+    // the search runs out of time immediately during Depth 1.
+    MoveList root_list;
+    generate_all_moves(pos, &root_list);
+    int side = pos->side_to_move;
+    int enemy = (side == WHITE) ? BLACK : WHITE;
+    int our_king = (side == WHITE) ? K : k;
+    for (int i = 0; i < root_list.count; i++) {
+        Board test_pos = *pos;
+        make_move(&test_pos, root_list.moves[i]);
+        if (test_pos.bitboards[our_king] == 0) continue;
+        int king_sq = get_lsb(test_pos.bitboards[our_king]);
+        if (!is_square_attacked(king_sq, enemy, &test_pos)) {
+            best_move = root_list.moves[i];
+            break;
+        }
+    }
+
     logger_start_search();
     
     uint64_t prev_total_nodes = 0;
@@ -161,7 +300,14 @@ int search_position(Board *pos, int time_limit_ms) {
 
         current_best_move = 0;
 
+        int scores[256];
         for (int i = 0; i < list.count; i++) {
+            scores[i] = score_move(pos, list.moves[i], best_move);
+        }
+
+        for (int i = 0; i < list.count; i++) {
+            sort_next_move(&list, scores, i);
+
             Board next_pos = *pos;
             make_move(&next_pos, list.moves[i]);
 
@@ -228,7 +374,14 @@ uint64_t search_for_benchmark(Board *pos, int depth) {
     int enemy = (side == WHITE) ? BLACK : WHITE;
     int our_king = (side == WHITE) ? K : k;
 
+    int scores[256];
     for (int i = 0; i < list.count; i++) {
+        scores[i] = score_move(pos, list.moves[i], 0);
+    }
+
+    for (int i = 0; i < list.count; i++) {
+        sort_next_move(&list, scores, i);
+
         Board next_pos = *pos;
         make_move(&next_pos, list.moves[i]);
         if (next_pos.bitboards[our_king] == 0) continue;

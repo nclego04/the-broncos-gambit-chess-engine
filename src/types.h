@@ -12,11 +12,30 @@
 
 typedef uint64_t U64;
 
+/**
+ * @brief Enumeration representing player colors and combined occupancy.
+ */
 enum { WHITE, BLACK, BOTH };
+
+/**
+ * @brief Enumeration representing all chess piece types.
+ * Uppercase represents White pieces, lowercase represents Black pieces.
+ */
 enum { P, N, B, R, Q, K, p, n, b, r, q, k };
 
+/**
+ * @brief Retrieves the state of a specific bit (square) from a bitboard.
+ */
 #define get_bit(bitboard, square) ((bitboard) & (1ULL << (square)))
+
+/**
+ * @brief Sets a specific bit (square) in a bitboard to 1.
+ */
 #define set_bit(bitboard, square) ((bitboard) |= (1ULL << (square)))
+
+/**
+ * @brief Clears (sets to 0) a specific bit (square) in a bitboard.
+ */
 #define pop_bit(bitboard, square) ((bitboard) &= ~(1ULL << (square)))
 
 /**
@@ -40,13 +59,16 @@ static inline int count_bits(U64 bitboard) {
     return __builtin_popcountll(bitboard);
 }
 
+/**
+ * @brief Represents the complete internal state of a chess board.
+ */
 typedef struct {
-    U64 bitboards[12];  
-    U64 occupancies[3];   
+    U64 bitboards[12];     /**< Individual bitboards for each piece type and color. */
+    U64 occupancies[3];    /**< Combined occupancies for WHITE, BLACK, and BOTH. */
     
-    int side_to_move;      
-    int en_passant;        
-    int castling_rights;   
+    int side_to_move;      /**< The color of the player whose turn it is to move. */
+    int en_passant;        /**< The square index where an en passant capture is possible, or -1 if none. */
+    int castling_rights;   /**< Bitmask storing current castling rights (1=WK, 2=WQ, 4=BK, 8=BQ). */
 } Board;
 
 /**

@@ -11,9 +11,10 @@
 #include "magics.h"
 #include "movegen.h"
 
-U64 knight_attacks[64];
-U64 king_attacks[64];
+U64 knight_attacks[64]; /**< Pre-calculated attack bitboards for knights on every square. */
+U64 king_attacks[64];   /**< Pre-calculated attack bitboards for kings on every square. */
 
+// --- Bitboard Constants for Masks ---
 const U64 FILE_A = 0x0101010101010101ULL;
 const U64 FILE_B = 0x0202020202020202ULL;
 const U64 FILE_G = 0x4040404040404040ULL;
@@ -120,10 +121,11 @@ U64 rook_attacks_on_the_fly(int sq, U64 block) {
     return attacks;
 }
 
-U64 rook_masks[64];
-U64 bishop_masks[64];
-U64 rook_attacks[64][4096];
-U64 bishop_attacks[64][512];
+// --- Global Tables for Sliding Piece Attacks ---
+U64 rook_masks[64];             /**< Masks of relevant blocker squares for rooks. */
+U64 bishop_masks[64];           /**< Masks of relevant blocker squares for bishops. */
+U64 rook_attacks[64][4096];     /**< Pre-calculated rook attacks mapped by magic index. */
+U64 bishop_attacks[64][512];    /**< Pre-calculated bishop attacks mapped by magic index. */
 
 /**
  * @brief Generates a specific blocker occupancy configuration from an index.

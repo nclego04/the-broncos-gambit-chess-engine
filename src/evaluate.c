@@ -7,11 +7,19 @@
  */
 #include "evaluate.h"
 
+/**
+ * @brief Base material values for each piece type in centipawns.
+ * Indexed by the piece enumeration (P=0, N=1, ..., k=11).
+ */
 const int piece_values[12] = {
     100, 300, 320, 500, 900, 20000, // WHITE: P, N, B, R, Q, K
     100, 300, 320, 500, 900, 20000  // BLACK: p, n, b, r, q, k
 };
 
+/**
+ * @brief Piece-Square Table (PST) for Pawns.
+ * Encourages controlling the center and advancing towards promotion.
+ */
 const int pawn_pst[64] = {
       0,  0,  0,  0,  0,  0,  0,  0,
      50, 50, 50, 50, 50, 50, 50, 50,
@@ -23,6 +31,10 @@ const int pawn_pst[64] = {
       0,  0,  0,  0,  0,  0,  0,  0
 };
 
+/**
+ * @brief Piece-Square Table (PST) for Knights.
+ * Encourages centralization and penalizes edge/corner placement.
+ */
 const int knight_pst[64] = {
     -50,-40,-30,-30,-30,-30,-40,-50,
     -40,-20,  0,  0,  0,  0,-20,-40,
@@ -34,6 +46,10 @@ const int knight_pst[64] = {
     -50,-40,-30,-30,-30,-30,-40,-50
 };
 
+/**
+ * @brief Piece-Square Table (PST) for Bishops.
+ * Encourages occupying long diagonals and the center.
+ */
 const int bishop_pst[64] = {
     -20,-10,-10,-10,-10,-10,-10,-20,
     -10,  0,  0,  0,  0,  0,  0,-10,
@@ -45,6 +61,10 @@ const int bishop_pst[64] = {
     -20,-10,-10,-10,-10,-10,-10,-20
 };
 
+/**
+ * @brief Piece-Square Table (PST) for Kings.
+ * Encourages king safety in the corners and penalizes centralization (for opening/middlegame).
+ */
 const int king_pst[64] = {
     -30,-40,-40,-50,-50,-40,-40,-30,
     -30,-40,-40,-50,-50,-40,-40,-30,
