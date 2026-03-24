@@ -37,7 +37,7 @@ Tracking the engine's playing strength and search performance across major updat
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **V1.0** | Baseline: Random Mover & Perft | N/A | N/A | ~76M | ~38.0 |
 | **V2.0** | Basic Alpha-Beta Search & Eval | ~1224 | ~6.0 | ~27.9M | ~15.7 |
-| **V3.0** | Move Ordering & Q-Search | ~1451 | ~7.5 | ~7.0M | ~12.5 |
+| **V3.0** | Move Ordering & Q-Search | ~1451 | ~6.5 | ~7.0M | ~12.5 |
 
 *Note on Benchmarking Methodology:*
 - *The **Estimated Elo** for V2.0 was calculated against Stockfish Level 0 (assumed ~1200 baseline) yielding a +24.4 Elo difference. V3.0 was tested via `cutechess-cli` in a nearly 4,000-game match against Stockfish Level 1 (assumed ~1350 baseline) at a 10+0.08 time control. A 64.2% win rate yielded a +101.1 Elo difference, resulting in ~1451 Elo.*
