@@ -10,6 +10,7 @@
 #include <ctype.h>
 #include "types.h"
 #include "board.h"
+#include "tt.h"
 
 /**
  * @brief Converts a character representation of a chess piece to its enum index.
@@ -82,6 +83,8 @@ void parse_fen(Board *pos, const char *fen) {
         else if (fen[i] == 'q') pos->castling_rights |= 8;
         i++;
     }
+
+    pos->hash_key = generate_hash_key(pos);
 }
 
 /**
@@ -101,6 +104,9 @@ void make_move(Board *pos, int move) {
     int side = pos->side_to_move;
     int enemy = (side == WHITE) ? BLACK : WHITE;
 
+    pos->hash_key ^= piece_keys[piece][from];
+    pos->hash_key ^= castle_keys[pos->castling_rights];
+
     pop_bit(pos->bitboards[piece], from);
     pop_bit(pos->occupancies[side], from);
     pop_bit(pos->occupancies[BOTH], from);
@@ -112,6 +118,7 @@ void make_move(Board *pos, int move) {
         for (int bb_piece = start_piece; bb_piece <= end_piece; bb_piece++) {
             if (get_bit(pos->bitboards[bb_piece], to)) {
                 pop_bit(pos->bitboards[bb_piece], to);
+                pos->hash_key ^= piece_keys[bb_piece][to];
                 break;
             }
         }
@@ -125,13 +132,16 @@ void make_move(Board *pos, int move) {
         pop_bit(pos->bitboards[captured_pawn_piece], captured_pawn_sq);
         pop_bit(pos->occupancies[enemy], captured_pawn_sq);
         pop_bit(pos->occupancies[BOTH], captured_pawn_sq);
+        pos->hash_key ^= piece_keys[captured_pawn_piece][captured_pawn_sq];
     }
 
     if (get_promotion(move)) {
         int promoted = get_promoted(move);
         set_bit(pos->bitboards[promoted], to);
+        pos->hash_key ^= piece_keys[promoted][to];
     } else {
         set_bit(pos->bitboards[piece], to);
+        pos->hash_key ^= piece_keys[piece][to];
     }
     set_bit(pos->occupancies[side], to);
     set_bit(pos->occupancies[BOTH], to);
@@ -152,6 +162,9 @@ void make_move(Board *pos, int move) {
         set_bit(pos->bitboards[rook], r_to);
         set_bit(pos->occupancies[side], r_to);
         set_bit(pos->occupancies[BOTH], r_to);
+
+        pos->hash_key ^= piece_keys[rook][r_from];
+        pos->hash_key ^= piece_keys[rook][r_to];
     }
 
     if (piece == K) pos->castling_rights &= ~3;
@@ -165,5 +178,8 @@ void make_move(Board *pos, int move) {
     if (to == 56) pos->castling_rights &= ~8;
     if (to == 63) pos->castling_rights &= ~4;
 
+    pos->hash_key ^= castle_keys[pos->castling_rights];
+
     pos->side_to_move = enemy;
+    pos->hash_key ^= side_key;
 }

@@ -14,6 +14,7 @@
 #include "movegen.h"
 #include "board.h"
 #include "logger.h"
+#include "tt.h"
 
 // --- Alpha-Beta Search Constants ---
 #define INF 50000
@@ -197,18 +198,26 @@ static int alpha_beta(Board *pos, int alpha, int beta, int depth, int ply) {
         return quiescence(pos, alpha, beta, ply);
     }
 
+    int hash_move = 0;
+    int tt_score = probe_tt(pos->hash_key, depth, alpha, beta, &hash_move, ply);
+    if (tt_score != TT_UNKNOWN) {
+        return tt_score;
+    }
+    int alpha_orig = alpha;
+
     MoveList list;
     generate_all_moves(pos, &list);
     
     int scores[256];
     for (int i = 0; i < list.count; i++) {
-        scores[i] = score_move(pos, list.moves[i], 0);
+        scores[i] = score_move(pos, list.moves[i], hash_move);
     }
 
     int legal_moves = 0;
     int side = pos->side_to_move;
     int enemy = (side == WHITE) ? BLACK : WHITE;
     int our_king = (side == WHITE) ? K : k;
+    int best_move = 0;
 
     for (int i = 0; i < list.count; i++) {
         sort_next_move(&list, scores, i);
@@ -225,10 +234,12 @@ static int alpha_beta(Board *pos, int alpha, int beta, int depth, int ply) {
         int score = -alpha_beta(&next_pos, -beta, -alpha, depth - 1, ply + 1);
 
         if (score >= beta) {
+            store_tt(pos->hash_key, depth, TT_BETA, beta, list.moves[i], ply);
             return beta;
         }
         if (score > alpha) {
             alpha = score;
+            best_move = list.moves[i];
         }
     }
 
@@ -240,6 +251,9 @@ static int alpha_beta(Board *pos, int alpha, int beta, int depth, int ply) {
             return 0;
         }
     }
+
+    int flag = (alpha > alpha_orig) ? TT_EXACT : TT_ALPHA;
+    store_tt(pos->hash_key, depth, flag, alpha, best_move, ply);
 
     return alpha;
 }

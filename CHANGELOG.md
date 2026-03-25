@@ -2,6 +2,14 @@
 
 All notable changes to the Broncos Gambit engine will be documented in this file.
 
+## [4.0.0] - Transposition Tables
+### Added
+- **Transposition Tables:** Implemented a hash table to store previously evaluated positions, dramatically speeding up the search by avoiding redundant calculations.
+- **Zobrist Hashing:** Used 64-bit polynomial string hashing to uniquely identify board positions for the transposition table with an extremely low collision rate.
+
+### Changed
+- **Benchmarking:** Unified the separate `bench_nps_ebf` and `bench_avg_depth` UCI commands into a single `bench` command that sequentially executes both tests.
+
 ## [3.0.0] - Move Ordering & Quiescence Search
 ### Added
 - **Quiescence Search:** Extended the search past the target depth for noisy positions (captures/promotions) to resolve tactical sequences and eliminate the Horizon Effect.

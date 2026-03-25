@@ -18,6 +18,7 @@
 #include "evaluate.h"
 #include "search.h"
 #include "logger.h"
+#include "tt.h"
 
 /**
  * @brief Parses a UCI move string and matches it to a valid engine move.
@@ -87,6 +88,7 @@ void uci_loop() {
         else if (strncmp(line, "ucinewgame", 10) == 0) {
             parse_fen(&pos, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
             
+            clear_tt();
             logger_init("=== NEW GAME STARTED ===");
         } 
         else if (strncmp(line, "position", 8) == 0) {
@@ -157,21 +159,14 @@ void uci_loop() {
                 fflush(stdout);
             }
         } 
-        else if (strncmp(line, "bench_nps_ebf", 13) == 0) {
+        else if (strncmp(line, "bench", 5) == 0) {
             char filename[256] = "bratko_kopec.epd";
             int depth = 6;
-            // Optionally parse custom filename and depth from the command
-            if (sscanf(line + 13, "%s %d", filename, &depth) >= 1) { }
-            
-            bench_nps_ebf(filename, depth);
-        }
-        else if (strncmp(line, "bench_avg_depth", 15) == 0) {
-            char filename[256] = "bratko_kopec.epd";
             int time_ms = 1000;
             
-            if (sscanf(line + 15, "%s %d", filename, &time_ms) >= 1) { }
+            if (sscanf(line + 5, "%s %d %d", filename, &depth, &time_ms) >= 1) { }
             
-            bench_avg_depth(filename, time_ms);
+            run_benchmarks(filename, depth, time_ms);
         }
         else if (strncmp(line, "eval", 4) == 0) {
             int score = evaluate_position(&pos);

@@ -11,3 +11,10 @@ broncos_engine
 *.epd
 *.pgn
 *.txt
+*.sh
+
+# OS and Editor files
+.DS_Store
+.vscode/
+.idea/
+*.exe

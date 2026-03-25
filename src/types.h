@@ -69,6 +69,7 @@ typedef struct {
     int side_to_move;      /**< The color of the player whose turn it is to move. */
     int en_passant;        /**< The square index where an en passant capture is possible, or -1 if none. */
     int castling_rights;   /**< Bitmask storing current castling rights (1=WK, 2=WQ, 4=BK, 8=BQ). */
+    U64 hash_key;          /**< Zobrist hash key of the position. */
 } Board;
 
 /**

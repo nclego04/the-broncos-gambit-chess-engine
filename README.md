@@ -5,9 +5,9 @@ A UCI-compatible Chess Engine written in C by Group 6 for ECE 4318.
 ## Overview
 The Broncos Gambit is a custom-built chess engine featuring a 64-bit bitboard board representation, a robust pseudo-legal and legal move generator, and an implementation of the Universal Chess Interface (UCI) protocol. 
 
-Currently at **Version 3.0**, the engine is a highly competitive intermediate-level opponent. It features an Alpha-Beta search algorithm, Quiescence Search, MVV-LVA Move Ordering, static evaluation using Piece-Square Tables, robust time management, and live performance analytics.
+Currently at **Version 4.0**, the engine is a highly competitive intermediate-level opponent. It features an Alpha-Beta search algorithm, Transposition Tables, Quiescence Search, MVV-LVA Move Ordering, static evaluation using Piece-Square Tables, robust time management, and live performance analytics.
 
-## Core Features (Version 3.0)
+## Core Features (Version 4.0)
 
 ### 1. Static Evaluation
 - **Material Counting:** Evaluates the board by summing up the standard values of pieces (e.g., Queens = 900, Knights = 300).
@@ -17,6 +17,8 @@ Currently at **Version 3.0**, the engine is a highly competitive intermediate-le
 - **Alpha-Beta Pruning (Negamax):** Mathematically proves which branches of the game tree are bad and skips them, vastly outperforming standard Minimax.
 - **MVV-LVA Move Ordering:** (Most Valuable Victim - Least Valuable Attacker) Sorts generated moves to search high-value captures first, maximizing pruning efficiency and dramatically lowering the Effective Branching Factor (EBF).
 - **Quiescence Search:** Extends the search past the target depth for "noisy" positions (captures and promotions), eliminating the Horizon Effect and preventing tactical blunders.
+- **Transposition Tables:** Caches previously evaluated board positions to avoid redundant calculations, drastically increasing search depth and speed.
+- **Zobrist Hashing:** Uses 64-bit polynomial string hashing to uniquely identify positions for the transposition table with near-zero collision probability.
 - **Iterative Deepening:** Searches layer by layer (Depth 1, 2, etc.) to gracefully stop and return its best guess when time runs out.
 - **Fastest-Mate Optimization:** Uses a `ply` variable to actively seek the fastest possible checkmate instead of delaying it.
 
@@ -38,10 +40,11 @@ Tracking the engine's playing strength and search performance across major updat
 | **V1.0** | Baseline: Random Mover & Perft | N/A | N/A | ~76M | ~38.0 |
 | **V2.0** | Basic Alpha-Beta Search & Eval | ~1224 | ~6.0 | ~27.9M | ~15.7 |
 | **V3.0** | Move Ordering & Q-Search | ~1451 | ~6.5 | ~7.0M | ~12.5 |
+| **V4.0** | Transposition Tables & Zobrist | ~1485 | ~7.6 | ~6.9M | ~11.8 |
 
 *Note on Benchmarking Methodology:*
-- *The **Estimated Elo** for V2.0 was calculated against Stockfish Level 0 (assumed ~1200 baseline) yielding a +24.4 Elo difference. V3.0 was tested via `cutechess-cli` in a nearly 4,000-game match against Stockfish Level 1 (assumed ~1350 baseline) at a 10+0.08 time control. A 64.2% win rate yielded a +101.1 Elo difference, resulting in ~1451 Elo.*
-- *The **engine efficiency metrics** were obtained using the internal `bench_nps_ebf` and `bench_avg_depth` commands against the 24-position **Bratko-Kopec** (`bratko_kopec.epd`) test suite. Average Depth was calculated by allocating exactly 1000ms per position. NPS and EBF were calculated by running a fixed Depth 6 search across the entire suite.*
+- *The **Estimated Elo** ratings are calculated via `cutechess-cli` against various Stockfish skill levels at a 10+0.08 time control. V3.0's ~1451 Elo comes from a +101.1 difference over Stockfish Level 1 (64.2% win rate). V4.0's ~1485 Elo comes from a +135.0 difference over the same opponent (68.5% win rate across 1,000 games).*
+- *The **engine efficiency metrics** (Avg Depth, NPS, EBF) are obtained using the internal `bench` command against the 24-position **Bratko-Kopec** (`bratko_kopec.epd`) test suite. Average Depth is calculated by allocating exactly 1000ms per position. NPS and EBF are calculated by running a fixed Depth 6 search across the entire suite.*
 
 ## Project Structure
 
@@ -80,8 +83,7 @@ You can run the engine directly from your terminal:
 - `isready` - Pings the engine to check if it's ready to receive commands.
 - `position startpos moves <m1> <m2>...` - Sets up the board state.
 - `go` - Tells the engine to calculate and return its best move using Alpha-Beta search.
-- `bench_nps_ebf [filename] [depth]` - Runs the engine's search algorithm across a suite of positions to measure Nodes Per Second (NPS) and Effective Branching Factor (EBF). Defaults to the 24-position **Bratko-Kopec test suite** (`bratko_kopec.epd`) at Depth 6 if no arguments are provided.
-- `bench_avg_depth [filename] [time_ms]` - Runs the engine's search algorithm across a suite of positions with a fixed time limit per move to measure the Average Depth reached. Defaults to the **Bratko-Kopec test suite** (`bratko_kopec.epd`) at 1000 ms if no arguments are provided.
+- `bench [filename] [depth] [time_ms]` - Runs the engine's search algorithm across a suite of positions to measure Nodes Per Second (NPS), Effective Branching Factor (EBF), and Average Depth reached. Defaults to `bratko_kopec.epd`, Depth 6, and 1000 ms if no arguments are provided.
 - `quit` - Exits the engine process.
 
 ### Using with the Java Arena (UciBoardArena)
@@ -97,7 +99,7 @@ To reproduce the ~1451 Elo rating, you can pit the engine against Stockfish Leve
 
 ```bash
 cutechess-cli \
-  -engine cmd=./bin/broncos_engine name="Broncos V3" \
+  -engine cmd=./bin/broncos_engine name="Broncos V4" \
   -engine cmd=stockfish name="Stockfish1" option."Skill Level"=1 \
   -each proto=uci tc=10+0.08 \
   -openings file=tests/bratko_kopec.epd format=epd order=random \
